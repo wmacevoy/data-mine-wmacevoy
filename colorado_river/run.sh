@@ -10,6 +10,22 @@ if [[ ! -d .venv ]]; then
     ./setup.sh
 fi
 
+# Ensure a local Streamlit config to suppress first-run onboarding prompt
+mkdir -p .streamlit
+if [[ ! -f .streamlit/config.toml ]]; then
+  cat > .streamlit/config.toml <<'EOF'
+[browser]
+gatherUsageStats = false
+
+[server]
+headless = true
+EOF
+fi
+
+# Also set env vars explicitly for non-interactive runs
+export STREAMLIT_BROWSER_GATHERUSAGESTATS=false
+export STREAMLIT_SERVER_HEADLESS=true
+
 # Step 2: pick mamba or conda
 if command -v mamba >/dev/null 2>&1; then
   CONDA_BIN="mamba"
