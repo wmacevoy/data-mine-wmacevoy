@@ -23,6 +23,8 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from datetime import datetime, timedelta, timezone
+import os
+import json
 
 from usgs import SITE_CATALOG, load_or_fetch_iv, load_or_fetch_dv
 from usgs import fetch_iv_json, fetch_dv_json
@@ -30,23 +32,95 @@ from eda import to_local, daily_features, rolling_anoms, summarize_gaps
 
 
 def arrow_safe_df(df: pd.DataFrame) -> pd.DataFrame:
-    """Return a copy suitable for Streamlit/Arrow serialization.
+    """Return a copy that is safe for Streamlit/Arrow to serialize.
 
-    - If index is datetime-like, reset index to a column.
-    - Remove timezone info from any datetime64 columns.
+    Steps:
+    - Reset the index so time indexes become normal columns.
+    - Attempt to coerce any date/time-like columns to pandas datetime64[ns].
+    - Drop timezone info from tz-aware columns (make them timezone-naive).
     """
     if df.empty:
         return df
     frame = df.reset_index()
-    for col in frame.columns:
+    for col in list(frame.columns):
         s = frame[col]
-        if getattr(s, "dt", None) is not None:
+        # Only attempt datetime coercion for object-like columns
+        if pd.api.types.is_object_dtype(s) or pd.api.types.is_string_dtype(s):
             try:
-                frame[col] = s.dt.tz_localize(None)
+                coerced = pd.to_datetime(s, errors="coerce")
+                # Keep coercion only if it's largely successful
+                if coerced.notna().sum() >= max(1, int(0.8 * len(coerced))):
+                    frame[col] = coerced
             except Exception:
-                # Non-tz or object dt access, ignore
                 pass
+            # If still object, but contains any Timestamp/datetime-like, force coerce
+            try:
+                sample = pd.Series([v for v in s if v is not None]).head(20)
+                if any(isinstance(v, (pd.Timestamp,)) for v in sample):
+                    frame[col] = pd.to_datetime(s, errors="coerce")
+            except Exception:
+                pass
+        # If datetime-like, ensure timezone-naive for Arrow
+        if pd.api.types.is_datetime64_any_dtype(frame[col]):
+            try:
+                if getattr(frame[col].dt, "tz", None) is not None:
+                    frame[col] = frame[col].dt.tz_localize(None)
+            except Exception:
+                # If dropping tz fails, fall back to string format
+                frame[col] = frame[col].astype(str)
     return frame
+
+
+def _dump_json(tag: str, site: str, payload: dict) -> None:
+    try:
+        os.makedirs("debug", exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+        path = os.path.join("debug", f"{tag}_{site}_{ts}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def _dump_df(tag: str, site: str, df: pd.DataFrame) -> None:
+    try:
+        os.makedirs("debug", exist_ok=True)
+        ts = datetime.now().strftime("%Y%m%dT%H%M%S")
+        head_path = os.path.join("debug", f"{tag}_{site}_{ts}_head.csv")
+        dtypes_path = os.path.join("debug", f"{tag}_{site}_{ts}_dtypes.txt")
+        df.head(50).to_csv(head_path)
+        with open(dtypes_path, "w", encoding="utf-8") as f:
+            f.write(str(df.dtypes))
+    except Exception:
+        pass
+
+
+def show_dataframe(df: pd.DataFrame, *, site: str, tag: str, enable_debug: bool) -> None:
+    """Render a DataFrame safely in Streamlit.
+
+    - First try Arrow-safe conversion.
+    - If it still fails, stringify datetime-like columns as a fallback.
+    - Optionally dump debug artifacts.
+    """
+    try:
+        safe = arrow_safe_df(df)
+        if enable_debug:
+            _dump_df(f"{tag}_arrow_safe", site, safe)
+        st.dataframe(safe)
+    except Exception as exc:
+        # Fallback: stringify any datetime-like columns
+        try:
+            fallback = df.reset_index().copy()
+            for col in list(fallback.columns):
+                s = fallback[col]
+                if pd.api.types.is_datetime64_any_dtype(s) or "datetime" in str(s.dtype).lower() or "date" in col.lower():
+                    fallback[col] = s.astype(str)
+            if enable_debug:
+                _dump_df(f"{tag}_fallback", site, fallback)
+            st.warning(f"Display fallback used for {tag} due to serialization error: {exc}")
+            st.dataframe(fallback)
+        except Exception as exc2:
+            st.error(f"Failed to render {tag}: {exc2}")
 
 st.set_page_config(page_title="Colorado River Flow — GJ", layout="wide")
 st.title("Colorado & Gunnison River Flow — near Grand Junction")
@@ -57,6 +131,7 @@ site = SITE_CATALOG[site_label]
 
 iv_days = st.sidebar.slider("Instantaneous window (days)", 1, 30, 7)
 dv_years = st.sidebar.slider("Daily window (years)", 1, 20, 5)
+debug_dump = st.sidebar.checkbox("Save debug snapshots", value=False)
 
 # ========== Instantaneous (IV) ==========
 left, right = st.columns(2)
@@ -73,19 +148,24 @@ with left:
         # Diagnostic summary about sampling cadence/gaps
         with st.expander("Sampling/Gaps Summary", expanded=False):
             gaps = summarize_gaps(df_iv_local)
-            # Ensure tz-aware timestamps render cleanly
-            for key in ("start", "end"):
-                if key in gaps.index:
-                    val = gaps.loc[key]
-                    if hasattr(val, "tz_localize"):
-                        try:
-                            gaps.loc[key] = val.tz_localize(None)
-                        except Exception:
-                            gaps.loc[key] = str(val)
-            st.write(gaps)
+            # Serialize to JSON-friendly strings to avoid Arrow mixed-type issues
+            gaps_json = {}
+            for k, v in gaps.items():
+                if isinstance(v, pd.Timestamp):
+                    gaps_json[k] = v.strftime("%Y-%m-%d %H:%M:%S")
+                elif pd.isna(v):
+                    gaps_json[k] = None
+                elif isinstance(v, float):
+                    gaps_json[k] = f"{v:.3f}"
+                else:
+                    gaps_json[k] = str(v)
+            st.json(gaps_json)
 
         st.markdown("**Recent samples**")
-        st.dataframe(arrow_safe_df(df_iv_local.tail(20)))
+        if debug_dump:
+            _dump_df("iv_raw", site, df_iv)
+            _dump_df("iv_local", site, df_iv_local)
+        show_dataframe(df_iv_local.tail(20), site=site, tag="iv_display", enable_debug=debug_dump)
 
         with st.expander("Raw IV JSON (sample)", expanded=False):
             try:
@@ -99,6 +179,8 @@ with left:
                     "first_series_name": (js.get("value", {}).get("timeSeries", [{}])[0] or {}).get("name"),
                     "first_point": ((js.get("value", {}).get("timeSeries", [{}])[0] or {}).get("values", [{}])[0] or {}).get("value", [{}])[0] if js.get("value", {}).get("timeSeries") else None,
                 })
+                if debug_dump:
+                    _dump_json("iv_json", site, js)
             except Exception as e:
                 st.write(f"IV JSON fetch error: {e}")
 
@@ -122,7 +204,9 @@ with right:
         st.info("No DV data returned for this range.")
     else:
         st.markdown("**USGS Daily Means (discharge)**")
-        st.dataframe(arrow_safe_df(df_dv.tail(10)))
+        if debug_dump:
+            _dump_df("dv", site, df_dv)
+        show_dataframe(df_dv.tail(10), site=site, tag="dv_display", enable_debug=debug_dump)
 
         with st.expander("Raw DV JSON (sample)", expanded=False):
             try:
@@ -134,6 +218,8 @@ with right:
                     "first_series_name": (js.get("value", {}).get("timeSeries", [{}])[0] or {}).get("name"),
                     "first_point": ((js.get("value", {}).get("timeSeries", [{}])[0] or {}).get("values", [{}])[0] or {}).get("value", [{}])[0] if js.get("value", {}).get("timeSeries") else None,
                 })
+                if debug_dump:
+                    _dump_json("dv_json", site, js)
             except Exception as e:
                 st.write(f"DV JSON fetch error: {e}")
 
@@ -143,7 +229,9 @@ with right:
             st.info("Daily IV features not available yet (no IV data).")
         else:
             st.markdown("**Daily features (from IV resample)**")
-            st.dataframe(feats.tail(10))
+            if debug_dump:
+                _dump_df("feats", site, feats)
+            show_dataframe(feats.tail(10), site=site, tag="feats_display", enable_debug=debug_dump)
 
             # Simple anomaly visualization: first z-score column if present
             anoms = rolling_anoms(feats)
@@ -151,7 +239,11 @@ with right:
             if zcols:
                 # Ensure a 'date' column exists for Altair
                 zdf = anoms.reset_index().rename(columns={"date": "date"})
+                if debug_dump:
+                    _dump_df("anoms", site, anoms)
                 zdf = arrow_safe_df(zdf)
+                if debug_dump:
+                    _dump_df("anoms_display", site, zdf)
                 chart = (
                     alt.Chart(zdf)
                     .mark_line()
