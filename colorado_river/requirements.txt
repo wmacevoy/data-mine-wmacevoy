@@ -6,4 +6,5 @@ pytz
 python-dateutil
 matplotlib
 altair
+pytest
 watchdog
