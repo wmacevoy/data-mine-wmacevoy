@@ -1,5 +1,7 @@
 ## Colorado & Gunnison River Flow — Streamlit App
 
+[![Colorado River CI](https://github.com/wmacevoy/data-mine-wmacevoy/actions/workflows/colorado_river_ci.yaml/badge.svg)](https://github.com/wmacevoy/data-mine-wmacevoy/actions/workflows/colorado_river_ci.yaml)
+
 A small, teaching-oriented Streamlit app that fetches and visualizes USGS river data (Colorado & Gunnison Rivers near Grand Junction). It shows instantaneous values (IV), daily values (DV), basic feature engineering, sampling gap diagnostics, and simple anomaly scores.
 
 ### Data sources
