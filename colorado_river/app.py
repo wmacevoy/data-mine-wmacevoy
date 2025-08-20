@@ -19,7 +19,6 @@ How the page is organized:
 - Left column: IV tables and charts.
 - Right column: DV table, daily features derived from IV, and anomaly chart.
 """
-
 import streamlit as st
 import pandas as pd
 import altair as alt
