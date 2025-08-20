@@ -16,6 +16,7 @@ A small, teaching-oriented Streamlit app that fetches and visualizes USGS river 
 - `requirements.txt`: Python deps
 - `setup.sh`: Creates/updates a local conda/mamba env at `./.venv` and installs deps
 - `run.sh`: Runs Streamlit inside the env (uses `python -m streamlit`)
+- `px.sh`: Runs the Parquet Explorer `px.py` inside the env
 - `.streamlit/config.toml`: Auto-created by `run.sh` to disable first-run
   onboarding and run headless by default
 - `data/`: Cached Parquet files per site and window
@@ -27,7 +28,7 @@ Prerequisites:
 
 Steps:
 1) Make scripts executable once:
-   - `chmod +x setup.sh run.sh`
+   - `chmod +x setup.sh run.sh px.sh`
 2) Launch the app:
    - `./run.sh`
    - `./run.sh --help` shows utility flags:
@@ -107,14 +108,19 @@ Debugging aid (optional):
 Use `px.py` to browse cached Parquet files from the command line.
 
 Examples:
+- Prefer using the wrapper `./px.sh`, which ensures the local env is set up. To see px.py flags, use `./px.sh -- --help`.
 - List columns and dtypes:
-  - `python px.py data/*.parquet --columns`
+  - `./px.sh data/*.parquet --columns`
 - Show head and basic info:
-  - `python px.py data/09163500_dv_5y.parquet --info --head 10`
+  - `./px.sh data/09163500_dv_5y.parquet --info --head 10`
 - Select columns and filter rows:
-  - `python px.py data/09095500_iv_7d.parquet --select time,discharge_cfs --where "discharge_cfs > 1000" --head 10`
+  - `./px.sh data/09095500_iv_7d.parquet --select time,discharge_cfs --where "discharge_cfs > 1000" --head 10`
 - Time-window filter:
-  - `python px.py data/09095500_iv_7d.parquet --time-col time --start 2025-08-10 --end 2025-08-12 --head 20`
+  - `./px.sh data/09095500_iv_7d.parquet --time-col time --start 2025-08-10 --end 2025-08-12 --head 20`
+
+Wrapper options handled by `px.sh` (not by `px.py`):
+- `--reset`: clears `./data/` and `./debug/`
+- `--restart`: deletes and recreates `./.venv` by re-running `./setup.sh`
 
 No license specified. Add one if you intend to distribute.
 
