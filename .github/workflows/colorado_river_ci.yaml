@@ -1,4 +1,4 @@
-name: CI
+name: Colorado River CI
 
 on:
   push:
