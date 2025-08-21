@@ -27,7 +27,7 @@ function conda_venv() {
 }
 
 function python_exe() {
-    conda_exe run -p "$(conda_venv)" python "$@"
+    "$(conda_exe)" run -p "$(conda_venv)" python "$@"
 }
 
 function config_json() {
@@ -52,7 +52,7 @@ function streamlit_server_headless() {
 }
 
 function streamlit_debug_snapshots() {
-    config_json '.debug'
+    config_json .debug
 }
 
 function streamlit_exports() {

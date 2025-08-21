@@ -81,7 +81,7 @@ if [[ -f config.json ]]; then
 fi
 
 
-# Install requirements conditionally (on --reset or if requirements.txt newer than .venv)
+# Install requirements conditionally (on --restart or if requirements.txt newer than .venv)
 if [[ -f requirements.txt ]]; then
   if $CREATED_ENV || $DO_RESTART || [[ requirements.txt -nt "$(conda_venv)" ]]; then
     echo ">> Installing requirements into $(conda_venv)"
