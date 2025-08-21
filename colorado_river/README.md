@@ -14,17 +14,17 @@ A small, teaching-oriented Streamlit app that fetches and visualizes USGS river 
 - `usgs.py`: USGS API client, caching to `./data/` as Parquet
 - `eda.py`: Helpers for timezone handling, resampling, feature engineering, and anomalies
 - `requirements.txt`: Python deps
-- `setup.sh`: Creates/updates a local conda/mamba env at `./.venv` and installs deps
-- `run.sh`: Runs Streamlit inside the env (uses `python -m streamlit`)
-- `px.sh`: Runs the Parquet Explorer `px.py` inside the env
-- `.streamlit/config.toml`: Auto-created by `run.sh` to disable first-run
-  onboarding and run headless by default
-- `data/`: Cached Parquet files per site and window
+- `setup.sh`: Creates/updates the local env at `./.venv`, resets caches, installs deps
+- `context.sh`: Shared helpers (e.g., `conda_exe`, `conda_venv`, `python_exe`, Streamlit env exports)
+- `python.sh`: Runs `python` inside the local env
+- `run.sh`: Runs Streamlit via `python.sh -m streamlit`
 - `px.py`: Simple Parquet data explorer (CLI)
- - `config.json`: Configuration of data sources (e.g., USGS site catalog)
- - `meta.py`: Lists configured USGS sources from `config.json`
- - `meta.sh`: Run `meta.py` inside the local env
- - `python.sh`: Run python in local env
+- `px.sh`: Runs `px.py` inside the env
+- `meta.py`: Lists configured USGS sources from `config.json`
+- `meta.sh`: Runs `meta.py` inside the env
+- `.streamlit/config.toml`: Auto-created by `setup.sh` based on `config.json`
+- `config.json`: App configuration (USGS sources, debug flag, Streamlit defaults)
+- `data/`: Cached Parquet files per site and window
 
 ### Quick start
 Prerequisites:
@@ -34,14 +34,15 @@ Steps:
    - `chmod +x setup.sh run.sh px.sh meta.sh python.sh`
 2) Setup/reset the environment
    - `./setup.sh --help` shows utility flags:
-     - `--debug`: implies `--reset`, clears `./data/` and `./debug/`, enables extra app debugging
-     - `--reset`: clears `./data/` and `./debug/` for a clean data load
-     - `--restart`: deletes and recreates `./.venv`
-3) Run `./run.sh` and pen the URL printed by Streamlit (default `http://localhost:8501`).
+     - `--debug`: implies `--reset`, clears `./data/` and `./debug/`, sets `config.json.debug=true`
+     - `--reset`: clears `./data/` and `./debug/`; reinstalls deps if needed
+     - `--restart`: deletes and recreates `./.venv` (fresh env)
+3) Run `./run.sh` and open the URL printed by Streamlit (default `http://localhost:8501`).
+   - Extra Streamlit args can be passed through, e.g. `./run.sh --server.port 8502`
 
 
 Notes:
-- The scripts use a prefix-based env at `./.venv` so you do not need to `conda init` or manually activate anything.
+- The scripts use a prefix-based env at `./.venv` (no `conda init` or manual activation needed).
 - If you prefer, you can still `conda activate /abs/path/to/.venv` and run `python -m streamlit run app.py` by hand.
 
 ### How it works (short version)
@@ -109,17 +110,13 @@ Debugging aid (optional):
 ### Parquet Explorer (CLI)
 Use `px.py` to browse cached Parquet files from the command line.
 
-Examples:
-- Prefer using the wrapper `./px.sh` (macOS/Linux) or `./px.ps1` (Windows), which ensures the local env is set up. To see px.py flags, use `./px.sh -- --help` or `./px.ps1 -- --help`.
-- List columns and dtypes:
-  - macOS/Linux: `./px.sh data/*.parquet --columns`
-- Show head and basic info:
-  - macOS/Linux: `./px.sh data/09163500_dv_5y.parquet --info --head 10`
-- Select columns and filter rows:
-  - macOS/Linux: `./px.sh data/09095500_iv_7d.parquet --select time,discharge_cfs --where "discharge_cfs > 1000" --head 10`
-- Time-window filter:
-  - macOS/Linux: `./px.sh data/09095500_iv_7d.parquet --time-col time --start 2025-08-10 --end 2025-08-12 --head 20`
+Examples (use the `./px.sh` wrapper so the env is used automatically):
+- List columns and dtypes: `./px.sh data/*.parquet --columns`
+- Show head and basic info: `./px.sh data/09163500_dv_5y.parquet --info --head 10`
+- Select columns and filter rows: `./px.sh data/09095500_iv_7d.parquet --select time,discharge_cfs --where "discharge_cfs > 1000" --head 10`
+- Time-window filter: `./px.sh data/09095500_iv_7d.parquet --time-col time --start 2025-08-10 --end 2025-08-12 --head 20`
 
-No license specified. Add one if you intend to distribute.
+### License
+Licensed under the MIT License. See `LICENSE`.
 
 
