@@ -15,6 +15,7 @@ Important concepts:
   We parse them and normalize to UTC internally for consistency.
 """
 import os
+import json
 from datetime import datetime, timedelta, timezone
 from dateutil import parser as dtp
 from typing import Dict, Tuple
@@ -30,13 +31,39 @@ USGS_DV_URL = "https://waterservices.usgs.gov/nwis/dv/"
 DISCHARGE_CFS = "00060"  # discharge in cubic feet per second
 STAGE_FT = "00065"        # gage height in feet
 
-# A small catalog of nearby gauges.
-# Feel free to expand this dict for lessons or personal interest.
-SITE_CATALOG: Dict[str, str] = {
-    "Colorado River near Cameo (09095500)": "09095500",
-    "Gunnison River near Grand Junction (09152500)": "09152500",
-    "Colorado River at CO–UT State Line (09163500)": "09163500",
-}
+def _load_site_catalog() -> Dict[str, str]:
+    """Load site catalog from config.json if present, else fallback.
+
+    The config format is expected to be:
+      { "usgs_sources": { "Label": "site_code", ... } }
+    """
+    default_catalog: Dict[str, str] = {
+        "Colorado River near Cameo (09095500)": "09095500",
+        "Gunnison River near Grand Junction (09152500)": "09152500",
+        "Colorado River at CO–UT State Line (09163500)": "09163500",
+    }
+    config_path = os.path.join(os.path.dirname(__file__), "config.json")
+    try:
+        if os.path.exists(config_path):
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            sources = cfg.get("usgs_sources")
+            if isinstance(sources, dict) and sources:
+                # Ensure keys/values are strings
+                cleaned: Dict[str, str] = {}
+                for k, v in sources.items():
+                    if isinstance(k, str) and isinstance(v, str) and k.strip() and v.strip():
+                        cleaned[k] = v
+                if cleaned:
+                    return cleaned
+    except Exception:
+        # Fall back silently on any error
+        pass
+    return default_catalog
+
+
+# Catalog of nearby gauges, potentially loaded from config.json
+SITE_CATALOG: Dict[str, str] = _load_site_catalog()
 
 # Where we cache data locally. Parquet is compact and fast with pandas>=2.
 DATA_DIR = os.path.join("data")

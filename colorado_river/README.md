@@ -15,37 +15,30 @@ A small, teaching-oriented Streamlit app that fetches and visualizes USGS river 
 - `eda.py`: Helpers for timezone handling, resampling, feature engineering, and anomalies
 - `requirements.txt`: Python deps
 - `setup.sh`: Creates/updates a local conda/mamba env at `./.venv` and installs deps
-- `setup.ps1`: Windows PowerShell equivalent of `setup.sh`
 - `run.sh`: Runs Streamlit inside the env (uses `python -m streamlit`)
-- `run.ps1`: Windows PowerShell equivalent of `run.sh`
 - `px.sh`: Runs the Parquet Explorer `px.py` inside the env
-- `px.ps1`: Windows PowerShell equivalent of `px.sh`
 - `.streamlit/config.toml`: Auto-created by `run.sh` to disable first-run
   onboarding and run headless by default
 - `data/`: Cached Parquet files per site and window
 - `px.py`: Simple Parquet data explorer (CLI)
+ - `config.json`: Configuration of data sources (e.g., USGS site catalog)
+ - `meta.py`: Lists configured USGS sources from `config.json`
+ - `meta.sh`: Run `meta.py` inside the local env
+ - `python.sh`: Run python in local env
 
 ### Quick start
 Prerequisites:
-- macOS/Linux with either `mamba` or `conda` on PATH, or Windows PowerShell with `mamba`/`conda` available in PATH
-
+- macOS/Linux with either `mamba` or `conda` on PATH, or Windows WSL 
 Steps:
 1) Make scripts executable once:
-   - macOS/Linux: `chmod +x setup.sh run.sh px.sh`
-   - Windows PowerShell: no chmod needed
-2) Launch the app:
-   - macOS/Linux: `./run.sh`
-   - Windows: `./run.ps1`
-   - `./run.sh --help` shows utility flags:
+   - `chmod +x setup.sh run.sh px.sh meta.sh python.sh`
+2) Setup/reset the environment
+   - `./setup.sh --help` shows utility flags:
      - `--debug`: implies `--reset`, clears `./data/` and `./debug/`, enables extra app debugging
      - `--reset`: clears `./data/` and `./debug/` for a clean data load
-     - `--restart`: deletes and recreates `./.venv` by re-running `setup.sh`
-3) Open the URL printed by Streamlit (default `http://localhost:8501`).
+     - `--restart`: deletes and recreates `./.venv`
+3) Run `./run.sh` and pen the URL printed by Streamlit (default `http://localhost:8501`).
 
-First run:
-- `run.sh`/`run.ps1` will create `.streamlit/config.toml` with
-  `gatherUsageStats=false` to suppress the email/onboarding prompt and
-  `server.headless=true` to support non-interactive runs.
 
 Notes:
 - The scripts use a prefix-based env at `./.venv` so you do not need to `conda init` or manually activate anything.
@@ -71,7 +64,7 @@ For easier troubleshooting of timestamp and schema, the app includes expanders s
 
 ### Troubleshooting
 - **“bad interpreter” or temp-dir shebang errors when starting Streamlit**
-  - We invoke Streamlit via `python -m streamlit` inside the env. Always use `./run.sh` (macOS/Linux) or `./run.ps1` (Windows). If you still see issues, remove `./.venv` and run `./setup.sh` or `./setup.ps1` again.
+  - We invoke Streamlit via `python -m streamlit` inside the env. Always use `./run.sh`. If you still see issues, try `./setup.sh --restart`
 
 - **ArrowInvalid / tz-aware timestamp errors in Streamlit tables**
   - This app normalizes datetimes before display. If you still see Arrow errors:
@@ -83,16 +76,20 @@ For easier troubleshooting of timestamp and schema, the app includes expanders s
 - **Port already in use**
   - Stop the other process, or run on a different port: `python -m streamlit run app.py --server.port 8502`
 
-- **Watchdog warning**
-  - Optional, but recommended for faster file-change detection: `pip install watchdog`
 
 ### USGS site catalog
-Defined in `usgs.py` (`SITE_CATALOG`). You can add more site codes as needed, e.g.:
+Defined in `config.json` under `usgs_sources`. You can add more site codes as needed, e.g.:
 ```
 "Colorado River near Cameo (09095500)": "09095500",
 "Gunnison River near Grand Junction (09152500)": "09152500",
 "Colorado River at CO–UT State Line (09163500)": "09163500",
 ```
+
+The app and CLI will load `SITE_CATALOG` from `config.json` with a safe fallback baked into `usgs.py`.
+
+### Meta utilities
+- To list currently available USGS sources:
+  - `./meta.sh`
 
 ### Development
 - Python formatting and style: keep code readable and explicit
@@ -116,20 +113,12 @@ Examples:
 - Prefer using the wrapper `./px.sh` (macOS/Linux) or `./px.ps1` (Windows), which ensures the local env is set up. To see px.py flags, use `./px.sh -- --help` or `./px.ps1 -- --help`.
 - List columns and dtypes:
   - macOS/Linux: `./px.sh data/*.parquet --columns`
-  - Windows: `./px.ps1 -- data/*.parquet --columns`
 - Show head and basic info:
   - macOS/Linux: `./px.sh data/09163500_dv_5y.parquet --info --head 10`
-  - Windows: `./px.ps1 -- data/09163500_dv_5y.parquet --info --head 10`
 - Select columns and filter rows:
   - macOS/Linux: `./px.sh data/09095500_iv_7d.parquet --select time,discharge_cfs --where "discharge_cfs > 1000" --head 10`
-  - Windows: `./px.ps1 -- data/09095500_iv_7d.parquet --select time,discharge_cfs --where "discharge_cfs > 1000" --head 10`
 - Time-window filter:
   - macOS/Linux: `./px.sh data/09095500_iv_7d.parquet --time-col time --start 2025-08-10 --end 2025-08-12 --head 20`
-  - Windows: `./px.ps1 -- data/09095500_iv_7d.parquet --time-col time --start 2025-08-10 --end 2025-08-12 --head 20`
-
-Wrapper options handled by `px.sh`/`px.ps1` (not by `px.py`):
-- macOS/Linux: `--reset`, `--restart`
-- Windows PowerShell: `-Reset`, `-Restart`
 
 No license specified. Add one if you intend to distribute.
 
