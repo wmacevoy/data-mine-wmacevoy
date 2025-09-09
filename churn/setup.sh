@@ -56,11 +56,11 @@ if $DO_RESTART || [[ ! -d "$(conda_venv)" ]]; then
   conda_exe create -y -p "$(conda_venv)"  -f environment.yml 1>&2 || exit 1
   conda_exe run -p "$(conda_venv)" R -q -e 'IRkernel::installspec(user = FALSE, prefix = ".venv")' || exit 1
   for exe in xetex bibtex ; do
-    if [ .venv/bin/$exe -ot $exe ]; then
+    if [ .venv/bin/$exe -ot $exe ] ; then
       cp $exe .venv/bin/$exe
       chmod +x .venv/bin/$exe
     fi
-  end
+  done
 
   CREATED_ENV=true
 fi
