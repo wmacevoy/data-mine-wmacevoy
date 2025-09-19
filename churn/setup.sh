@@ -53,7 +53,7 @@ CREATED_ENV=false
 if $DO_RESTART || [[ ! -d "$(conda_venv)" ]]; then
   echo ">> Recreating env at $(conda_venv) (python=$PY_VERSION)"
   rm -rf "$(conda_venv)"
-  conda_exe create -y -p "$(conda_venv)"  -f environment.yml 1>&2 || exit 1
+  conda_exe env create  -f environment.yml -p "$(conda_venv)" 1>&2 || exit 1
   conda_exe run -p "$(conda_venv)" R -q -e 'IRkernel::installspec(user = FALSE, prefix = ".venv")' || exit 1
   for exe in xetex bibtex ; do
     if [ .venv/bin/$exe -ot $exe ] ; then
