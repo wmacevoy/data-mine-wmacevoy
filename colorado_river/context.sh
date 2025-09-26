@@ -12,7 +12,7 @@ function conda_exe() {
                 if [ $# -eq 0 ]; then
                     echo $cmd
                 else
-                    $cmd "$@"
+                    "$cmd" "$@"
                 fi
                 return
             fi
@@ -27,7 +27,7 @@ function conda_venv() {
 }
 
 function python_exe() {
-    "$(conda_exe)" run -p "$(conda_venv)" python "$@"
+    conda_exe run -p "$(conda_venv)" python "$@"
 }
 
 function config_json() {

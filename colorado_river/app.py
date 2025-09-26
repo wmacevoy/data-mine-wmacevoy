@@ -28,6 +28,7 @@ import json
 
 from usgs import SITE_CATALOG, load_or_fetch_iv, load_or_fetch_dv
 from usgs import fetch_iv_json, fetch_dv_json
+from usgs import WATER_TEMP_C, SALINITY_PPT, DISCHARGE_CFS
 from eda import to_local, daily_features, rolling_anoms, summarize_gaps
 
 
@@ -186,7 +187,12 @@ with left:
 
         # Prepare a tidy frame for Altair (friendly with Streamlit)
         base = arrow_safe_df(df_iv_local).rename(columns={"time": "t"})
-        for field, label in [("discharge_cfs", "Discharge (cfs)"), ("stage_ft", "Stage (ft)")]:
+        for field, label in [
+            ("discharge_cfs", "Discharge (cfs)"),
+            ("stage_ft", "Stage (ft)"),
+            ("water_temp_c", "Water Temp (°C)"),
+            ("salinity_ppt", "Salinity (ppt)"),
+        ]:
             if field in base.columns:
                 chart = (
                     alt.Chart(base)
@@ -199,7 +205,8 @@ with left:
 # ========== Daily aggregates & anomalies ==========
 with right:
     st.subheader("Daily means & basic features")
-    df_dv = load_or_fetch_dv(site, years=dv_years)
+    # Fetch DV for discharge (existing behavior)
+    df_dv = load_or_fetch_dv(site, years=dv_years, parameter=DISCHARGE_CFS, stat_code="00003")
     if df_dv.empty:
         st.info("No DV data returned for this range.")
     else:
@@ -222,6 +229,62 @@ with right:
                     _dump_json("dv_json", site, js)
             except Exception as e:
                 st.write(f"DV JSON fetch error: {e}")
+
+        # Weekly average discharge (resampled from DV daily means)
+        try:
+            dv_weekly = df_dv.copy()
+            dv_weekly.index = pd.to_datetime(dv_weekly.index)
+            dv_weekly = dv_weekly.resample("W").mean()
+            dv_weekly.index.name = "week"
+            weekly_display = dv_weekly.reset_index().rename(columns={"discharge_cfs": "weekly_avg_cfs"})
+            st.markdown("**Weekly average discharge (cfs)**")
+            weekly_chart = (
+                alt.Chart(arrow_safe_df(weekly_display))
+                .mark_line()
+                .encode(
+                    x=alt.X("week:T", title="Week"),
+                    y=alt.Y("weekly_avg_cfs:Q", title="Discharge (cfs)")
+                )
+                .properties(height=220)
+            )
+            st.altair_chart(weekly_chart, use_container_width=True)
+        except Exception as e:
+            st.info(f"Could not compute weekly averages: {e}")
+
+        # Additional DV series: water temperature and salinity (daily means)
+        try:
+            df_dv_temp = load_or_fetch_dv(site, years=dv_years, parameter=WATER_TEMP_C, stat_code="00003")
+            if not df_dv_temp.empty and "water_temp_c" in df_dv_temp.columns:
+                st.markdown("**USGS Daily Means (water temperature, °C)**")
+                show_dataframe(df_dv_temp.tail(10), site=site, tag="dv_temp_display", enable_debug=debug_dump)
+                tdf = df_dv_temp.reset_index().rename(columns={"date": "date"})
+                tdf = arrow_safe_df(tdf)
+                temp_chart = (
+                    alt.Chart(tdf)
+                    .mark_line(color="#d62728")
+                    .encode(x="date:T", y=alt.Y("water_temp_c:Q", title="Water Temp (°C)"))
+                    .properties(height=220)
+                )
+                st.altair_chart(temp_chart, use_container_width=True)
+        except Exception as e:
+            st.info(f"Temperature DV fetch failed: {e}")
+
+        try:
+            df_dv_sal = load_or_fetch_dv(site, years=dv_years, parameter=SALINITY_PPT, stat_code="00003")
+            if not df_dv_sal.empty and "salinity_ppt" in df_dv_sal.columns:
+                st.markdown("**USGS Daily Means (salinity, ppt)**")
+                show_dataframe(df_dv_sal.tail(10), site=site, tag="dv_sal_display", enable_debug=debug_dump)
+                sdf = df_dv_sal.reset_index().rename(columns={"date": "date"})
+                sdf = arrow_safe_df(sdf)
+                sal_chart = (
+                    alt.Chart(sdf)
+                    .mark_line(color="#1f77b4")
+                    .encode(x="date:T", y=alt.Y("salinity_ppt:Q", title="Salinity (ppt)"))
+                    .properties(height=220)
+                )
+                st.altair_chart(sal_chart, use_container_width=True)
+        except Exception as e:
+            st.info(f"Salinity DV fetch failed: {e}")
 
         # Derive daily features from IV (independent of DV for teaching)
         feats = daily_features(df_iv)

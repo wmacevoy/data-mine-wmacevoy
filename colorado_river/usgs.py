@@ -30,6 +30,8 @@ USGS_DV_URL = "https://waterservices.usgs.gov/nwis/dv/"
 # Parameter codes we care about (see USGS parameter catalog)
 DISCHARGE_CFS = "00060"  # discharge in cubic feet per second
 STAGE_FT = "00065"        # gage height in feet
+WATER_TEMP_C = "00010"    # water temperature in degrees Celsius
+SALINITY_PPT = "00480"    # salinity, parts per thousand (ppt)
 
 def _load_site_catalog() -> Dict[str, str]:
     """Load site catalog from config.json if present, else fallback.
@@ -88,7 +90,7 @@ def fetch_iv(
     site: str,
     start: datetime,
     end: datetime,
-    parameters: Tuple[str, ...] = (DISCHARGE_CFS, STAGE_FT),
+    parameters: Tuple[str, ...] = (DISCHARGE_CFS, STAGE_FT, WATER_TEMP_C, SALINITY_PPT),
 ) -> pd.DataFrame:
     """Fetch Instantaneous Values (IV) for a time window, return as DataFrame.
 
@@ -129,7 +131,12 @@ def fetch_iv(
 
     out = pd.concat(frames, axis=1).sort_index()
     # Replace numeric parameter codes with friendly column names
-    rename = {DISCHARGE_CFS: "discharge_cfs", STAGE_FT: "stage_ft"}
+    rename = {
+        DISCHARGE_CFS: "discharge_cfs",
+        STAGE_FT: "stage_ft",
+        WATER_TEMP_C: "water_temp_c",
+        SALINITY_PPT: "salinity_ppt",
+    }
     out = out.rename(columns={k: v for k, v in rename.items() if k in out.columns})
     return out
 
@@ -174,7 +181,11 @@ def fetch_dv(
         return pd.DataFrame(index=pd.Index([], name="date"))
 
     out = pd.concat(frames, axis=1).sort_index()
-    rename = {DISCHARGE_CFS: "discharge_cfs"}
+    rename = {
+        DISCHARGE_CFS: "discharge_cfs",
+        WATER_TEMP_C: "water_temp_c",
+        SALINITY_PPT: "salinity_ppt",
+    }
     out = out.rename(columns={k: v for k, v in rename.items() if k in out.columns})
     return out
 
@@ -227,7 +238,8 @@ def load_or_fetch_iv(site: str, days: int = 7) -> pd.DataFrame:
     """Fetch IV data, caching to Parquet (./data/)."""
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=days)
-    path = _cache_path(site, f"iv_{days}d")
+    # Include 'all' to reflect the expanded parameter set in cache key
+    path = _cache_path(site, f"iv_all_{days}d")
     if os.path.exists(path):
         return pd.read_parquet(path)
     df = fetch_iv(site, start, end)
@@ -235,13 +247,13 @@ def load_or_fetch_iv(site: str, days: int = 7) -> pd.DataFrame:
     return df
 
 
-def load_or_fetch_dv(site: str, years: int = 5) -> pd.DataFrame:
-    """Fetch DV data, caching to Parquet (./data/)."""
+def load_or_fetch_dv(site: str, years: int = 5, parameter: str = DISCHARGE_CFS, stat_code: str = "00003") -> pd.DataFrame:
+    """Fetch DV data (for a single parameter), caching to Parquet (./data/)."""
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=365 * years)
-    path = _cache_path(site, f"dv_{years}y")
+    path = _cache_path(site, f"dv_{parameter}_{stat_code}_{years}y")
     if os.path.exists(path):
         return pd.read_parquet(path)
-    df = fetch_dv(site, start, end)
+    df = fetch_dv(site, start, end, stat_code=stat_code, parameter=parameter)
     df.to_parquet(path)
     return df

@@ -4,7 +4,7 @@
     "Gunnison River near Grand Junction (09152500)": "09152500",
     "Colorado River at CO–UT State Line (09163500)": "09163500"
   },
-  "debug": true,
+  "debug": false,
   "streamlit": {
     "browser_gather_usage_stats": false,
     "server_headless": true
