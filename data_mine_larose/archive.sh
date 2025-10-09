@@ -10,15 +10,30 @@ ARCHIVE_DIR="$here/archive"
 
 mkdir -p "$ARCHIVE_DIR"
 
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' RETURN
+
 # Normalize line endings: CRLF/CR -> LF, write to stdout
 normalize_to_lf() {
   # awk version avoids nonstandard deps (dos2unix/perl)
   awk '{ sub(/\r$/, ""); print }' "$1"
 }
 
-# Heuristic: is it a CSV? (file(1) varies by platform, so keep case-insensitive)
+# Is csv with same number of columns in each row and header line
 is_csv() {
-  [[ -f "$1" ]] && file -b "$1" | grep -qi 'csv'
+  local path="$1"
+  [[ -f "$path" ]] || return 1
+  # sample first 20 non-empty lines
+  awk -F',' '
+    NF>0 {
+      commas = gsub(/,/, ",")
+      if (max_fields == 0) max_fields = NF
+      if (NF != max_fields) bad=1
+      if ($0 ~ /\t|;/) bad=1
+      if (NR>20) exit
+    }
+    END { exit bad }
+  ' "$path"
 }
 
 archive_one() {
@@ -34,18 +49,13 @@ archive_one() {
     return 0
   fi
 
-  local tmpdir
-  tmpdir="$(mktemp -d)"
-  # Ensure the tmpdir is removed even on errors inside this function
-  trap 'rm -rf "$tmpdir"' RETURN
-
   # Normalize into temp dir with a clean filename
   normalize_to_lf "$src" > "$tmpdir/$dataset.csv"
 
   # Create a zip with just dataset.csv inside; -X strips extra attrs; -j drops paths
-  ( cd "$tmpdir" && zip -q -X -j "$dataset.csv.zip" "$dataset.csv" )
+  ( cd "$TMP_DIR" && zip -q -X -j "$dataset.csv.zip" "$dataset.csv" )
 
-  mv -f "$tmpdir/$dataset.csv.zip" "$ARCHIVE_DIR/$dataset.csv.zip"
+  mv -f "$TMP_DIR/$dataset.csv.zip" "$ARCHIVE_DIR/$dataset.csv.zip"
   echo "archived: $dataset -> archive/$dataset.csv.zip"
 }
 
