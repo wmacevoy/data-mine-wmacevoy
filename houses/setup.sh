@@ -56,7 +56,7 @@ if $DO_RESTART || [[ ! -d "$(conda_venv)" ]]; then
   # Clean caches to avoid SafetyError on stale/corrupted packages
   conda_exe clean -a -y 1>&2 || true
   # Prefer arm64 subdir explicitly and use libmamba solver if available
-  export CONDA_SUBDIR=osx-arm64
+#  export CONDA_SUBDIR=osx-arm64
   conda_exe install -n base -c conda-forge conda-libmamba-solver -y 1>&2 || true
   conda_exe env create --solver libmamba -f environment.yml -p "$(conda_venv)" 1>&2 || exit 1
   # Register R kernel under a stable name (idempotent)
