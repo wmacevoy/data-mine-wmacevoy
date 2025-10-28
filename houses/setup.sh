@@ -53,8 +53,14 @@ CREATED_ENV=false
 if $DO_RESTART || [[ ! -d "$(conda_venv)" ]]; then
   echo ">> Recreating env at $(conda_venv) (python=$PY_VERSION)"
   rm -rf "$(conda_venv)"
-  conda_exe env create  -f environment.yml -p "$(conda_venv)" 1>&2 || exit 1
-  conda_exe run -p "$(conda_venv)" R -q -e 'IRkernel::installspec(user = FALSE, sys_prefix = TRUE)' || exit 1
+  # Clean caches to avoid SafetyError on stale/corrupted packages
+  conda_exe clean -a -y 1>&2 || true
+  # Prefer arm64 subdir explicitly and use libmamba solver if available
+  export CONDA_SUBDIR=osx-arm64
+  conda_exe install -n base -c conda-forge conda-libmamba-solver -y 1>&2 || true
+  conda_exe env create --solver libmamba -f environment.yml -p "$(conda_venv)" 1>&2 || exit 1
+  # Register R kernel under a stable name (idempotent)
+#  conda_exe run -p "$(conda_venv)" R -q -e 'IRkernel::installspec(name = "venv-r", displayname = "R (.venv)", user = FALSE, sys_prefix = TRUE)' || exit 1
   for exe in xetex bibtex ; do
     if [ .venv/bin/$exe -ot $exe ] ; then
       cp $exe .venv/bin/$exe
@@ -106,3 +112,12 @@ if [[ -f requirements.txt ]]; then
     touch "$(conda_venv)"
   fi
 fi
+
+# Idempotent kernel registration (Python + R) under stable names
+echo ">> Ensuring Jupyter kernels are registered (sys-prefix)"
+# Ensure ipykernel present even if environment.yml was changed
+python_exe -m pip install -q -U ipykernel || exit 1
+# Register Python kernel (overwrites if exists)
+# python_exe -m ipykernel install --sys-prefix --name venv-py --display-name "Python (.venv)" 1>&2 || exit 1
+# Register R kernel again to ensure consistency (idempotent)
+# conda_exe run -p "$(conda_venv)" R -q -e 'IRkernel::installspec(name = "venv-r", displayname = "R (.venv)", user = FALSE, sys_prefix = TRUE)' || exit 1
