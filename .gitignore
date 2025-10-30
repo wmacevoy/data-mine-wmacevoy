@@ -1,1 +1,6 @@
 /Miniforge3-*.sh
+/.DS_Store
+*/models
+*/data
+.#*
+*~
