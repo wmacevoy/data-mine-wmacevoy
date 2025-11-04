@@ -1,0 +1,22 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file: private/secrets.env
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./private:/app/private
+    command: ["uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000"]
+  # Optional Postgres with pgvector (disabled by default). Uncomment to use.
+  # db:
+  #   image: postgres:16
+  #   environment:
+  #     POSTGRES_DB: rag
+  #     POSTGRES_USER: raguser
+  #     POSTGRES_PASSWORD: ragpass
+  #   volumes:
+  #     - ./data/db:/var/lib/postgresql/data
+
+

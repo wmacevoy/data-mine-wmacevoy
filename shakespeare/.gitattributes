@@ -1,0 +1,4 @@
+# Encrypt everything under private/ with git-crypt
+private/** filter=git-crypt diff=git-crypt
+
+

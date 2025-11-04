@@ -1,0 +1,42 @@
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - jupyterlab
+  - ipykernel
+  - nodejs
+  # Python deps for this project (install via conda where available)
+  - numpy
+  - scipy
+  - scikit-learn
+  - pandas
+  - requests
+  - beautifulsoup4
+  - pyyaml
+  - pip
+  - pip:
+      - fastapi==0.115.2
+      - "uvicorn[standard]==0.31.1"
+      - pydantic==2.9.2
+      - python-dotenv==1.0.1
+      - joblib==1.4.2
+  # Core R & tools (explicit, avoid r-essentials to reduce conflicts)
+  - r-base=4.4
+  - r-irkernel
+  - r-languageserver
+  # Plotting & data wrangling
+  - r-tidyverse
+  - r-ggplot2
+  - r-ggally
+  - r-corrplot
+  - r-gridextra
+  - r-scales
+  - r-patchwork
+  - r-ggstats
+  - r-s7
+  - r-data.table
+  # (Optional) nice-to-haves
+  - pandoc
+  - quarto
+  - tectonic
+  - latexmk

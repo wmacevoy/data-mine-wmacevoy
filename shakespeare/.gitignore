@@ -1,0 +1,25 @@
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv/
+.env
+.DS_Store
+.ipynb_checkpoints/
+
+# Data artifacts (keep directories but ignore heavy contents)
+data/raw/**
+data/processed/**
+data/embeddings/**
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+!data/embeddings/.gitkeep
+
+# Docker/build artifacts
+*.log
+dist/
+build/
+
+# Do NOT ignore private/ — it is tracked and encrypted via git-crypt
+# private/
+
+
