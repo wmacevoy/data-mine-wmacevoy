@@ -107,3 +107,9 @@ fi
 # Idempotent kernel registration (Python + R) under stable names
 echo ">> Ensuring Jupyter is available and kernel registered (sys-prefix)"
 python_exe -m pip install -q -U ipykernel || exit 1
+
+# Build container images (optional, ignore if docker not available)
+if command -v docker >/dev/null 2>&1; then
+  echo ">> Building docker images (app, static, db)"
+  docker compose build || true
+fi

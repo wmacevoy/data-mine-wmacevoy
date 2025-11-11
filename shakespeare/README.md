@@ -71,7 +71,7 @@ rag-llm-agent/
 | ---------------- | -------------------------------------- | -------------------------------------------------- |
 | **Ingestion**    | Collect, clean, and normalize datasets | Python, Pandas, BeautifulSoup                      |
 | **Embedding**    | Convert text into numerical vectors    | OpenAI `text-embedding-3-large`, Cohere, or Voyage |
-| **Vector Store** | Store embeddings and metadata          | `pgvector`, `Chroma`, or `Weaviate`                |
+| **Vector Store** | Store embeddings and metadata          | Postgres + `pgvector` (persistent volume)          |
 | **Retrieval**    | Find relevant chunks per user query    | Hybrid search: sparse TF‑IDF + dense LSA (SVD)     |
 | **Generation**   | Prompt LLM with retrieved context      | GPT‑5‑turbo, Claude 3.5, or Mistral                |
 
@@ -106,9 +106,31 @@ retrieval:
   dense_dim: 256
 ```
 
-Run the build to (re)compute both sparse and dense artifacts:
+### Model Selection (Generation + Embeddings)
 
-- API: `POST /build`
+Control models via `config/settings.yaml`:
+
+```
+generation:
+  # "mock" uses a local template (offline). To use OpenAI, prefix with "openai-".
+  # Example: "openai-gpt-4o-mini"
+  model: "mock"
+
+embeddings:
+  # Choose between classic IR (tfidf) and OpenAI embeddings
+  method: tfidf   # or "openai"
+  # Only used when method=openai
+  model: text-embedding-3-small
+```
+
+- When `embeddings.method: tfidf`, the pipeline fits TF–IDF + TruncatedSVD locally and saves
+  `vectorizer.joblib`, `tfidf.npz`, `svd.joblib`, and `dense.npy`.
+- When `embeddings.method: openai`, it calls the OpenAI Embeddings API and saves only `dense.npy`.
+- For Postgres indexing with pgvector, table vector dimension is chosen automatically based on config.
+
+Run the build to (re)compute artifacts:
+
+- API: `POST /build` (full build) or `POST /rebuild` (incremental, new/modified files)
 - Notebooks: `00_initialize.ipynb` (optional) → `01_ingestion.ipynb` → `02_embedding.ipynb`
 
 ## Prompt Template
@@ -142,6 +164,12 @@ Recommended tools: **TruLens**, **Langfuse**, **OpenAI Evals**.
 * Containerize with **Docker Compose**.
 * Schedule nightly ingestion of new festival data.
 
+### Local Dashboard
+
+- Static dashboard is served at `http://localhost:8080` (index.html and admin.html)
+- Start everything and open browser + Jupyter: `./run.sh all`
+- API base is `http://localhost:8000` and supports CORS from `http://localhost:8080`
+
 ### Secrets
 
 All secrets are read from the encrypted `private/` directory using `private/secrets.env`.
@@ -159,13 +187,25 @@ services:
       - "8000:8000"
     env_file: private/secrets.env
   db:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_DB: rag
       POSTGRES_USER: raguser
       POSTGRES_PASSWORD: ragpass
     volumes:
       - ./data/db:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+### Idempotent Indexing
+
+Raw files under `data/raw/` are chunked with origin metadata tracked in Postgres:
+
+- `documents(origin_path, origin_mtime, origin_sha256)`
+- `chunks(document_id, chunk_index, chunk_sha256, content, embedding vector)`
+
+The app performs upserts so re-processing the same file updates existing rows.
+Use `POST /rebuild` to process only new/modified files based on file timestamps and content hashes.
 ```
 
 ---

@@ -11,5 +11,7 @@ scipy==1.13.1
 python-dotenv==1.0.1
 jupyterlab==4.2.5
 joblib==1.4.2
-
+psycopg[binary,pool]==3.2.1
+pgvector==0.2.5
+openai>=1.33.0
 
