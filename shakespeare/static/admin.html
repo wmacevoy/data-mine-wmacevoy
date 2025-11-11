@@ -1,0 +1,57 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shakespeare Admin</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; max-width: 900px; }
+    header { display: flex; justify-content: space-between; align-items: baseline; }
+    pre { background: #fafafa; padding: 1rem; border: 1px solid #ddd; border-radius: 8px; white-space: pre-wrap; }
+    button { margin-right: .5rem; }
+  </style>
+  <script>
+    const API_BASE = new URLSearchParams(location.search).get('api') || 'http://localhost:8000';
+    async function call(path, opts={}) {
+      const res = await fetch(`${API_BASE}${path}`, opts);
+      const txt = await res.text();
+      try { return JSON.parse(txt); } catch { return txt; }
+    }
+    async function doBuild() {
+      setMsg('Building...');
+      const data = await call('/build', { method: 'POST' });
+      setMsg(JSON.stringify(data, null, 2));
+    }
+    async function doRebuild() {
+      setMsg('Rebuilding incrementally...');
+      const data = await call('/rebuild', { method: 'POST' });
+      setMsg(JSON.stringify(data, null, 2));
+    }
+    async function showConfig() {
+      const data = await call('/config');
+      setMsg(JSON.stringify(data, null, 2));
+    }
+    async function health() {
+      const data = await call('/health');
+      setMsg(JSON.stringify(data, null, 2));
+    }
+    function setMsg(m) { document.getElementById('out').textContent = typeof m === 'string' ? m : JSON.stringify(m, null, 2); }
+  </script>
+</head>
+<body>
+  <header>
+    <h1>Shakespeare Admin</h1>
+    <nav><a href="/index.html">Home</a></nav>
+  </header>
+  <p>API: <code>http://localhost:8000</code> (override with <code>?api=...</code>)</p>
+  <div>
+    <button onclick="health()">Health</button>
+    <button onclick="showConfig()">Config</button>
+    <button onclick="doBuild()">Build</button>
+    <button onclick="doRebuild()">Rebuild (incremental)</button>
+  </div>
+  <h3>Output</h3>
+  <pre id="out"></pre>
+</body>
+</html>
+
