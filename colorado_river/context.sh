@@ -6,7 +6,7 @@ function context_dir() {
 
 function conda_exe() {
     local cmd bin dist
-    for cmd in mamba conda; do
+    for cmd in conda; do
         for dist in miniforge3 miniconda3; do
             if command -v $cmd >/dev/null 2>&1 || [ -x "$HOME/$dist/bin/$cmd" ]; then
                 if [ $# -eq 0 ]; then
